@@ -48,7 +48,7 @@ class AvoidObject(object):
         xsf = []
         ysf = []
         for i in range(len(ranges)):
-            if ranges[i] != 0 and ranges[i]<2:
+            if ranges[i] != 0 and ranges[i]<1.5:
                 theta = math.radians(i+90)
                 r = ranges[i]
                 xf = math.cos(theta)*r
@@ -82,8 +82,8 @@ class AvoidObject(object):
             y = y_list[i]
             dist = math.sqrt(y**2 + x**2)
             theta = math.atan2(y, x)
-            x = a * (s + radius - dist) * math.cos(theta)
-            y = a * (s + radius - dist) * math.sin(theta)
+            x = -a * (s + radius - dist) * math.cos(theta)
+            y = -a * (s + radius - dist) * math.sin(theta)
             neg_vector[0] = neg_vector[0] + x
             neg_vector[1] = neg_vector[1] + y
         pos_vector = [0, 0*a]
@@ -92,23 +92,24 @@ class AvoidObject(object):
         # try plotting some validation
         plt.plot(self.xs, self.ys, 'ro', markersize=10)     # all points
         plt.plot(0, 0, 'go', markersize=15)                 # neato at 0,0
-        plt.quiver(vector_move[0], vector_move[1], 'r')     # resultant vector
+        plt.quiver(vector_move[0], vector_move[1])     # resultant vector
 
         return vector_move
 
     def drive_to_target(self, r, t):
-        goal_d = 0.5    # desired distance away from target
+        goal_d = 0      # desired distance away from target
         goal_t = 0      # desired angle away from goal, 0 to face target
 
         err_d = r - goal_d  # error terms
         err_t = t - goal_t
 
-        kp_d = 0      # proportional control constants
-        kp_t = 0
+        kp_d = 0.005      # proportional control constants
+        kp_t = 0.01
 
         x_vel = kp_d*err_d
         t_vel = kp_t*err_t
-
+        print(r, t)
+        print(x_vel, t_vel)
         send = self.make_twist(x_vel, t_vel)
         self.pub.publish(send)
 
@@ -116,10 +117,9 @@ class AvoidObject(object):
         while self.go:
             # checks if list is populated by first scan
             if isinstance(self.xs, list):
-                t_x, t_y = self.points_to_vector(self.xs, self.ys, 1, .2) #we can test these out
-                plt.plot(self.xs, self.ys, 'yo', markersize=10) # where robot should be going
-                plt.plot(t_x, t_y)
+                t_x, t_y = self.points_to_vector(self.xs, self.ys, 1, .2)
                 r, theta = self.cart_to_polar(t_x, t_y)
+                # plt.show()
                 self.drive_to_target(r, theta)
 
         self.pub.publish(self.stop) # if bump sense breaks self.go loop, stop
