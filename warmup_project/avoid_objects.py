@@ -11,9 +11,11 @@ import statistics
 import time, numpy, math, rospy
 
 class AvoidObject(object):
-    """avoids objects"""
+    """avoids objects. Runs a potential field algorithm where every non-zero
+       laser scan point is treated as a repulsive point."""
 
     def __init__(self):
+        """initialize ROS stuff."""
         rospy.init_node("AvoidObject")
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         rospy.Subscriber('/scan', LaserScan, self.process_scan)
@@ -25,7 +27,7 @@ class AvoidObject(object):
         self.go = True
 
     def make_twist(self, x, theta):
-        """ Takes x and angular velocity and creates the appropriate twist
+        """takes x and angular velocity and creates the appropriate twist
         to publish to the cmd_vel topic."""
         send = Twist()
         send.linear.x = x
@@ -36,17 +38,15 @@ class AvoidObject(object):
         send.angular.z = theta
         return send
 
-    def show_plot(self):
-        plt.plot(self.xs, self.ys, 'ro')
-        plt.plot(0,0, 'bo', markersize=15)
-        #plt.show()
-
     def process_scan(self, m):
+        """process scan data to clean 0s and only look within a certain max
+           distance from the laser scanner."""
         ranges = m.ranges
         xs = []
         ys = []
         xsf = []
         ysf = []
+
         for i in range(len(ranges)):
             if ranges[i] != 0 and ranges[i]<1.5:
                 theta = math.radians(i+90)
@@ -60,6 +60,7 @@ class AvoidObject(object):
         self.ys = ys
 
     def process_bump(self, m):
+        """uses the bump sensor as an e-stop for the neato."""
         lf = m.leftFront
         rf = m.rightSide
 
@@ -68,13 +69,19 @@ class AvoidObject(object):
             self.go = False
 
     def cart_to_polar(self, x, y):
+        """descriptive title."""
         r = math.sqrt(y**2 + x**2)
+
         # subtract 90 to account for robot forward heading=90
         theta = math.degrees(numpy.arctan2(y,x))-90
         return (r, theta)
 
     def points_to_vector(self, x_list,y_list,a,radius):
-        # a is scaling factor
+        """Takes in a point cloud of obstacles and defines a vector at (0, 0)
+           on the neato's position that points along the gradient of the
+           potential field. Adds a positive vector that pushes the neato to
+           move forward along its heading. "a" is a scaling factor. Returns the
+           vector to which the neato should turn to align itself."""
         neg_vector = [0,0]
         s = 3 # spread of field
         for i in range(len(x_list)):
@@ -97,6 +104,8 @@ class AvoidObject(object):
         return vector_move
 
     def drive_to_target(self, r, t):
+        """proportional control for driving a robot towards a goal point in
+           polar coordinates. Experiemtnally tuned Kp values."""
         goal_d = 0      # desired distance away from target
         goal_t = 0      # desired angle away from goal, 0 to face target
 
@@ -108,18 +117,16 @@ class AvoidObject(object):
 
         x_vel = kp_d*err_d
         t_vel = kp_t*err_t
-        print(r, t)
-        print(x_vel, t_vel)
         send = self.make_twist(x_vel, t_vel)
         self.pub.publish(send)
 
     def run(self):
+        """main run loop"""
         while self.go:
             # checks if list is populated by first scan
             if isinstance(self.xs, list):
                 t_x, t_y = self.points_to_vector(self.xs, self.ys, 1, .2)
                 r, theta = self.cart_to_polar(t_x, t_y)
-                # plt.show()
                 self.drive_to_target(r, theta)
 
         self.pub.publish(self.stop) # if bump sense breaks self.go loop, stop

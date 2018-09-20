@@ -15,25 +15,15 @@ import datetime
 import rospy
 
 class Drive(object):
-    """This node is to test the neato interface and get it moving"""
+    """This node is to teleoperate the neato"""
 
     def __init__(self):
         rospy.init_node("Drive")
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         rospy.Subscriber('/bump', Bump, self.process_bump)
-        # rospy.Subscriber('/scan', LaserScan, self.process_scan)
-
-    def process_scan(self, m):
-        pass
-        # print(m.ranges[0])
-
-    def process_bump(self, m):
-        pass
-        #print(m.leftFront)
 
     def make_twist(self, x, theta):
-        """
-        Takes x and angular velocity and creates the appropriate twist
+        """Takes x and angular velocity and creates the appropriate twist
         to publish to the cmd_vel topic.
         """
         sendy = Twist()
@@ -46,8 +36,7 @@ class Drive(object):
         return sendy
 
     def move_dist(self, distance):
-        """
-        Takes a distance in meters and moves it forward. Works under the
+        """Takes a distance in meters and moves it forward. Works under the
         timing that 0.5 cmd_vel = 1 ft/s.
         """
         speed = 0.5
@@ -63,9 +52,8 @@ class Drive(object):
             stop_msg = make_twist(0,0)
             self.pub.publish(stop_msg)
 
-
-
     def getKey(self):
+        """Pre-made code for grabbing key strokes"""
         tty.setraw(sys.stdin.fileno())
         select.select([sys.stdin], [], [], 0)
         key = sys.stdin.read(1)
@@ -73,6 +61,7 @@ class Drive(object):
         return key
 
     def run(self):
+        """Simple logic for driving the robot with key strokes."""
         while not rospy.is_shutdown():
             key = None
             while key != '\x03':
@@ -93,7 +82,7 @@ class Drive(object):
                 lin_vel = 1
                 ang_vel = 1
 
-                x_vel = move[0]*lin_vel
+                x_vel = move[0]*lin_vel         # velocities to send
                 theta_vel = move[1]*ang_vel
 
                 sendy = Twist()
